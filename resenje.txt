@@ -1,0 +1,220 @@
+import random
+import networkx as nx
+import numpy as np
+import matplotlib.pyplot as plt
+from itertools import permutations
+
+# Define the problem: list of cities and their coordinates
+cities = {
+    'A': (0, 0),
+    'B': (1, 2),
+    'C': (3, 1),
+    'D': (5, 2),
+    'E': (6, 0),
+    'F': (3, 7),
+    'G': (2, 5),
+    'H': (0, 5)
+}
+
+# Genetic Algorithm Parameters
+#***********podaci i elitizam (elitis_rate = procenti dati) , obrisati elitizam ako nije dato u zadatku
+population_size = 50
+generations = 100
+mutation_rate = 0.7
+elitis_rate = 0.1
+
+
+# Function to calculate the total distance of a route
+def calculate_distance(route):
+    total_distance = 0
+    for i in range(len(route) - 1):
+        city1 = route[i]
+        city2 = route[i + 1]
+        total_distance += ((cities[city2][0] - cities[city1][0]) ** 2 +
+                           (cities[city2][1] - cities[city1][1]) * 2) * 0.5
+    return total_distance
+
+# Initialize the population with random routes
+def generate_initial_population(size):
+    cities_list = list(cities.keys())
+    all_permutations = list(permutations(cities_list))
+    return [list(perm) for perm in random.sample(all_permutations, size)]
+
+
+def rank_chromosomes(cost, chromosomes):
+  costs = list(map(cost, chromosomes))
+  ranked  = sorted( list(zip(chromosomes,costs)), key = lambda c:c[1])
+
+  return list(zip(*ranked))
+
+#*********** random selekcija
+'''def random_selection(parents,fitness_scores):
+  pairs = []
+  for i in range(0, len(parents), 2):
+    pair=random.choices(parents, weights=fitness_scores, k=2)
+    pairs.append(pair)
+  return pairs'''
+
+#*********** rulet selekcija
+def roulette_selection(parents):
+
+  pairs = []
+  i = 0
+  for i in range(0, len(parents), 2):
+
+    weights=[];
+    for i in range(len(parents)):
+        weights.append((len(parents)-i)*random.random()) #za minimum
+      #  weights.append((i+1)*random.random()) #za maksimum
+    if (weights[0]>=weights[1]):
+        maxInd1=0;
+        maxInd2=1;
+    else:
+        maxInd1=1;
+        maxInd2=0;
+
+    for i in range(2,len(parents)):
+        if weights[i]>weights[maxInd1]:
+            maxInd2=maxInd1
+            maxInd1=i
+        elif weights[i]>weights[maxInd2]:
+            maxInd2=1
+    pairs.append([parents[maxInd1], parents[maxInd2]])
+
+  return pairs
+
+#*********** ukrstanje sa 1 tackom
+
+# Perform crossover to create a new generation
+def crossover(pairs):
+  children = []
+
+  for parent1,parent2 in pairs:
+    crossover_point = random.randint(1, len(parent1) - 1)
+    #crossover_point=3
+    child1 = parent1[:crossover_point] + [city for city in parent2 if city not in parent1[:crossover_point]]
+    child2 = parent2[:crossover_point] + [city for city in parent1 if city not in parent2[:crossover_point]]
+    children.append(child1)
+    children.append(child2)
+  return children
+
+#*********** ukrstanje sa 2 tacke
+
+'''def two_point_crossover(pairs):
+  length = len(pairs[0])
+  children = []
+
+  for (a,b) in pairs:
+
+#*********** random trazenje tacke
+      #r1 = random.randrange(0, length)
+      #r2 = random.randrange(0, length)
+
+#*********** date tacke
+      r1 = 4
+      r2 = 7
+
+      if r1 < r2:
+        children.append(a[:r1] + b[r1:r2] + a[r2:])
+        children.append(b[:r1] + a[r1:r2] + b[r2:])
+      else:
+        children.append(a[:r2] + b[r2:r1] + a[r1:])
+        children.append(b[:r2] + a[r2:r1] + b[r1:])
+
+  return children'''
+
+#*********** rotacija
+
+# Perform mutation on an individual route
+'''def mutate(chromosomes):
+  mutated_chromosomes = []
+  for route in chromosomes:
+
+    if random.random() < mutation_rate:
+        mutation_point1 = random.randint(0, len(route) - 1)
+        mutation_point2 = random.randint(0, len(route) - 1)
+        route[mutation_point1], route[mutation_point2] = route[mutation_point2], route[mutation_point1]
+
+    mutated_chromosomes.append(route)
+  return mutated_chromosomes'''
+
+#*********** inverzija
+
+def inv_mutation(chromosomes, mutation_rate):
+  mutated_chromosomes = []
+
+  for chromosome in chromosomes:
+
+    if random.random() < mutation_rate:
+      r1 = random.randrange(0, len(chromosome) - 1)
+      r2 = random.randrange(0, len(chromosome) - 1)
+
+
+      if r1 < r2:
+        mutated_chromosomes.append(chromosome[:r1] + chromosome[r1:r2][::-1] + chromosome[r2:])
+      else:
+        mutated_chromosomes.append(chromosome[:r2] + chromosome[r2:r1][::-1] + chromosome[r1:])
+
+    else:
+      mutated_chromosomes.append(chromosome)
+
+
+  return mutated_chromosomes
+
+
+#*********** elitizam (obrisati ako nema)
+def elitis(chromosomes_old,chromosomes_new, elitis_rate, population_size):
+  old_ind_size=int(np.round(population_size*elitis_rate))
+  return chromosomes_old[:old_ind_size]+chromosomes_new[:(population_size-old_ind_size)]
+
+# Genetic Algorithm
+def genetic_algorithm():
+    population = generate_initial_population(population_size)
+
+    for generation in range(generations):
+        ranked_parents, costs = rank_chromosomes(calculate_distance, population)
+        # Evaluate fitness of each route
+        fitness_scores = [1 / calculate_distance(route) for route in population]
+
+#*********** pozivanje svih ovih funkcija(elitizam obrisati ako ne postoji)
+
+        # Select parents based on fitness
+        # VODITE RACUNA DA JE OVDE ODABRANA RANDOM SELEKCIJA A MOZDA JE BOLJE DA SE KORISTI NEKA OD PREDAVANIH
+        #KAO STO JE NPR RULET SELEKCIJA
+        pairs = roulette_selection(ranked_parents)
+
+      #  print(pairs)
+        # Create the next generation using crossover
+        children = crossover(pairs)
+
+        # Apply mutation
+        chromosomes = inv_mutation(children, mutation_rate)
+
+        # Replace a random route in the population with the child
+        ranked_children, costs = rank_chromosomes(calculate_distance, chromosomes)
+       
+        ##elitizam
+        chromosomes=elitis(ranked_parents,ranked_children, elitis_rate, population_size)
+
+
+
+        #population=chromosomes ##DODATA LINIJE KODA (nova generacija se menja sa potomcima)
+        # Print the best route in each generation
+        best_route = min(ranked_children, key=calculate_distance)
+        print(f"Generation {generation + 1}: Best Route {best_route}, Distance {calculate_distance(best_route)}")
+
+    # Print the final best route
+    best_route = min(population, key=calculate_distance)
+ #   print(f"Final Best Route: {best_route}, Distance: {calculate_distance(best_route)}")
+
+    # Plot the TSP graph for the best route
+    tsp_graph = nx.Graph()
+    tsp_graph.add_nodes_from(best_route)
+    tsp_graph.add_edges_from([(best_route[i], best_route[i + 1]) for i in range(len(best_route) - 1)])
+    pos = {city: cities[city] for city in tsp_graph.nodes}
+    nx.draw(tsp_graph, pos, with_labels=True, node_size=700, node_color='skyblue', font_size=8, font_color='black', font_weight='bold', edge_color='gray', linewidths=1, alpha=0.7)
+    plt.title(f"Best Route: {best_route}, Distance: {calculate_distance(best_route)}")
+
+
+# Run the genetic algorithm
+genetic_algorithm()
